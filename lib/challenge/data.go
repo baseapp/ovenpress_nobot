@@ -63,6 +63,9 @@ type RequestData struct {
 	query  traits.Mapper
 
 	opts map[string]string
+
+	WasProxied           bool
+	IsResponseTimeExempt bool
 }
 
 func CreateRequestData(r *http.Request, state StateInterface) (*http.Request, *RequestData) {
@@ -70,7 +73,7 @@ func CreateRequestData(r *http.Request, state StateInterface) (*http.Request, *R
 	var data RequestData
 	// generate random id, todo: is this fast?
 	_, _ = rand.Read(data.Id[:])
-	data.RemoteAddress = utils.GetRequestAddress(r, state.Settings().ClientIpHeader)
+	data.RemoteAddress = utils.GetRequestAddress(r, state.GetClientIpHeader(r.Host))
 	data.ChallengeVerify = make(map[Id]VerifyResult, len(state.GetChallenges()))
 	data.ChallengeState = make(map[Id]VerifyState, len(state.GetChallenges()))
 	data.Time = time.Now().UTC()
@@ -301,6 +304,13 @@ func (d *RequestData) EvaluateChallenges(w http.ResponseWriter, r *http.Request)
 		challengeMap = make(TokenChallengeMap)
 	}
 	d.ChallengeMap = challengeMap
+
+	if d.State.IsResponseTimeLimitExceeded(r) {
+		d.State.Logger(r).Warn("revoking authentication due to excessive cumulative response time", "remote_ip", d.RemoteAddress.Addr())
+		for _, reg := range d.State.GetChallenges() {
+			d.ClearChallengeToken(reg)
+		}
+	}
 
 	for _, reg := range d.State.GetChallenges() {
 

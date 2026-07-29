@@ -138,6 +138,7 @@ func GetRequestAddress(r *http.Request, clientHeader string) netip.AddrPort {
 	if strVal != "" {
 		// handle X-Forwarded-For
 		strVal = strings.Split(strVal, ",")[0]
+		strVal = strings.TrimSpace(strVal)
 	}
 
 	// fallback

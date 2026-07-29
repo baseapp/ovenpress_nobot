@@ -109,3 +109,13 @@ func (state *State) Strings() utils.Strings {
 func (state *State) GetBackend(host string) http.Handler {
 	return utils.SelectHTTPHandler(state.Settings().Backends, host)
 }
+
+func (state *State) GetClientIpHeader(host string) string {
+	if b, ok := state.opt.SelectBackend(host); ok && b.ClientIpHeader != "" {
+		if b.ClientIpHeader == "-" {
+			return ""
+		}
+		return b.ClientIpHeader
+	}
+	return state.settings.ClientIpHeader
+}

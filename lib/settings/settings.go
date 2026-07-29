@@ -3,6 +3,7 @@ package settings
 import (
 	"git.gammaspectra.live/git/go-away/utils"
 	"maps"
+	"strings"
 )
 
 type Settings struct {
@@ -22,6 +23,9 @@ type Settings struct {
 
 	// ChallengeTemplateOverrides Key/Value overrides for the current chosen template
 	ChallengeTemplateOverrides map[string]string `yaml:"challenge-template-overrides"`
+
+	ClientIpHeader  string `yaml:"client-ip-header"`
+	BackendIpHeader string `yaml:"backend-ip-header"`
 }
 
 type Link struct {
@@ -49,4 +53,22 @@ var DefaultSettings = Settings{
 		TLSAcmeAutoCert: "",
 	},
 	Backends: make(map[string]Backend),
+}
+
+func (s *Settings) SelectBackend(host string) (Backend, bool) {
+	backend, ok := s.Backends[host]
+	if !ok {
+		// do wildcard match
+		parts := strings.Split(host, ".")
+		if len(parts) > 1 {
+			wildcard := "*." + strings.Join(parts[1:], ".")
+			backend, ok = s.Backends[wildcard]
+		}
+
+		if !ok {
+			// return fallback
+			backend, ok = s.Backends["*"]
+		}
+	}
+	return backend, ok
 }

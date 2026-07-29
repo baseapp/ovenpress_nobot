@@ -6,7 +6,14 @@ import (
 	"io"
 	"os"
 	"path"
+	"time"
 )
+
+type ResponseTimeProtection struct {
+	Window        time.Duration `yaml:"window"`
+	Limit         time.Duration `yaml:"limit"`
+	SkipCondition string        `yaml:"skip_condition"`
+}
 
 type Policy struct {
 
@@ -18,6 +25,8 @@ type Policy struct {
 	Challenges map[string]Challenge `yaml:"challenges"`
 
 	Rules []Rule `yaml:"rules"`
+
+	ResponseTimeProtection ResponseTimeProtection `yaml:"response_time_protection"`
 }
 
 func NewPolicy(r io.Reader, snippetsDirectories ...string) (*Policy, error) {

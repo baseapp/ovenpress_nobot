@@ -23,6 +23,14 @@ conditions:
     # - 'path.startsWith("/static/") || path.startsWith("/assets/")'
 
 
+# Protect against slow backend responses or heavy resource usage by revoking auth
+response_time_protection:
+  window: 30s
+  limit: 5s
+  # Skip response time tracking for static assets
+  skip_condition: '($is-static-asset)'
+
+
 # Rules are checked sequentially in order, from top to bottom
 rules:
   - name: allow-well-known-resources

@@ -100,10 +100,6 @@ func main() {
 
 	flag.Parse()
 
-	if *backendIpHeader == "" {
-		*backendIpHeader = *clientIpHeader
-	}
-
 	var err error
 
 	{
@@ -148,6 +144,17 @@ func main() {
 		err = yaml.Unmarshal(settingsData, &opt)
 		if err != nil {
 			fatal(fmt.Errorf("could not parse settings file: %w", err))
+		}
+	}
+
+	if *clientIpHeader == "" && opt.ClientIpHeader != "" {
+		*clientIpHeader = opt.ClientIpHeader
+	}
+	if *backendIpHeader == "" {
+		if opt.BackendIpHeader != "" {
+			*backendIpHeader = opt.BackendIpHeader
+		} else {
+			*backendIpHeader = *clientIpHeader
 		}
 	}
 

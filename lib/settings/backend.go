@@ -26,6 +26,9 @@ type Backend struct {
 	// IpHeader HTTP header to set containing the IP header. Set - to forcefully ignore global defaults.
 	IpHeader string `yaml:"ip-header"`
 
+	// ClientIpHeader HTTP header to fetch the client IP address from. Set - to forcefully ignore global defaults.
+	ClientIpHeader string `yaml:"client-ip-header"`
+
 	// GoDNS Resolve URL using the Go DNS server
 	// Only relevant when running with CGO enabled
 	GoDNS bool `yaml:"go-dns"`

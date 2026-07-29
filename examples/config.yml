@@ -26,6 +26,13 @@ bind:
 # Bind the Prometheus metrics onto /metrics path on this port
 #bind-metrics: ":9090"
 
+# Client HTTP header to fetch their IP address from (X-Real-Ip, X-Client-Ip, X-Forwarded-For, Cf-Connecting-Ip, etc.)
+# Required when running behind reverse proxies like Cloudflare.
+#client-ip-header: "CF-Connecting-Ip"
+
+# Backend HTTP header to set the client IP address from, if empty defaults to client-ip-header
+#backend-ip-header: "X-Real-IP"
+
 # These links will be shown on the presented challenge or error pages
 links:
   #- name: Privacy
@@ -59,6 +66,9 @@ backends:
   #"git.example.com":
   #  url: "http://forgejo:3000"
   #  ip-header: "X-Client-Ip"
+  #  # HTTP header to read connecting client IP from for this backend specifically.
+  #  # Useful when this backend is behind Cloudflare while others are not. Set - to ignore global defaults.
+  #  client-ip-header: "CF-Connecting-Ip"
 
   # Example HTTP backend matching a non-standard port in Host
   # Standard ports are 80 and 443. Others will be sent in Host by browsers

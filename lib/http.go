@@ -216,9 +216,16 @@ func (state *State) fetchTags(host string, backend http.Handler, r *http.Request
 }
 
 func (state *State) handleRequest(w http.ResponseWriter, r *http.Request) {
+	t0 := time.Now()
 	host := r.Host
 
 	data := challenge.RequestDataFromContext(r.Context())
+
+	defer func() {
+		if data.WasProxied && !data.IsResponseTimeExempt {
+			state.tracker.Record(data.RemoteAddress.Addr(), time.Since(t0), state.responseTimeWindow)
+		}
+	}()
 
 	lg := state.Logger(r)
 
@@ -243,6 +250,7 @@ func (state *State) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cleanupRequest := func(r *http.Request, fromChallenge bool, ruleName string, ruleAction policy.RuleAction) {
+		data.WasProxied = true
 		if fromChallenge {
 			r.Header.Del("Referer")
 		}

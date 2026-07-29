@@ -7,12 +7,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,6 +71,9 @@ type State struct {
 	responseTimeLimit  time.Duration
 	responseTimeWindow time.Duration
 	responseTimeSkip   cel.Program
+
+	accessLogWriter io.Writer
+	accessLogMutex  sync.Mutex
 }
 
 func NewState(p policy.Policy, opt settings.Settings, settings policy.StateSettings) (state *State, err error) {
@@ -309,6 +314,21 @@ func NewState(p policy.Policy, opt settings.Settings, settings policy.StateSetti
 		state.responseTimeSkip = skipProgram
 	}
 
+	if settings.AccessLog != "" {
+		dir := filepath.Dir(settings.AccessLog)
+		if dir != "." && dir != "/" {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create access log directory: %w", err)
+			}
+		}
+		file, err := os.OpenFile(settings.AccessLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open access log file: %w", err)
+		}
+		state.accessLogWriter = file
+	}
+
 	return state, nil
 }
 
@@ -323,6 +343,11 @@ func (state *State) Close() error {
 				if err != nil {
 					return err
 				}
+			}
+		}
+		if state.accessLogWriter != nil {
+			if file, ok := state.accessLogWriter.(*os.File); ok {
+				_ = file.Close()
 			}
 		}
 	}
@@ -351,4 +376,53 @@ func (state *State) IsResponseTimeLimitExceeded(r *http.Request) bool {
 
 	totalTime := state.tracker.Sum(data.RemoteAddress.Addr(), state.responseTimeWindow)
 	return totalTime > state.responseTimeLimit
+}
+
+type AccessLogEntry struct {
+	Time       string  `json:"time"`
+	RemoteIP   string  `json:"remote_ip"`
+	Host       string  `json:"host"`
+	Method     string  `json:"method"`
+	Path       string  `json:"path"`
+	Query      string  `json:"query"`
+	Status     int     `json:"status"`
+	BytesSent  int64   `json:"bytes_sent"`
+	DurationMs float64 `json:"duration_ms"`
+	UserAgent  string  `json:"user_agent"`
+	Rule       string  `json:"rule,omitempty"`
+	Action     string  `json:"action,omitempty"`
+}
+
+func (state *State) WriteAccessLog(r *http.Request, data *challenge.RequestData, status int, bytesSent int64, duration time.Duration, rule, action string) {
+	if state.accessLogWriter == nil {
+		return
+	}
+	entry := AccessLogEntry{
+		Time:       time.Now().UTC().Format(time.RFC3339),
+		RemoteIP:   data.RemoteAddress.Addr().String(),
+		Host:       r.Host,
+		Method:     r.Method,
+		Path:       r.URL.Path,
+		Query:      r.URL.RawQuery,
+		Status:     status,
+		BytesSent:  bytesSent,
+		DurationMs: float64(duration.Microseconds()) / 1000.0,
+		UserAgent:  r.UserAgent(),
+		Rule:       rule,
+		Action:     action,
+	}
+
+	bytes, err := json.Marshal(entry)
+	if err != nil {
+		state.Logger(r).Error("failed to marshal access log entry", "error", err)
+		return
+	}
+
+	state.accessLogMutex.Lock()
+	defer state.accessLogMutex.Unlock()
+
+	_, err = state.accessLogWriter.Write(append(bytes, '\n'))
+	if err != nil {
+		state.Logger(r).Error("failed to write access log entry", "error", err)
+	}
 }

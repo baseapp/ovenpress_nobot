@@ -33,6 +33,9 @@ bind:
 # Backend HTTP header to set the client IP address from, if empty defaults to client-ip-header
 #backend-ip-header: "X-Real-IP"
 
+# Path to request access log file (stores structured JSON entries for incoming requests)
+#access-log: "/var/log/nobot/access.log"
+
 # These links will be shown on the presented challenge or error pages
 links:
   #- name: Privacy

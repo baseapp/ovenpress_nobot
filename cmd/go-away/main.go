@@ -77,6 +77,7 @@ func main() {
 
 	clientIpHeader := flag.String("client-ip-header", "", "Client HTTP header to fetch their IP address from (X-Real-Ip, X-Client-Ip, X-Forwarded-For, Cf-Connecting-Ip, etc.)")
 	backendIpHeader := flag.String("backend-ip-header", "", "Backend HTTP header to set the client IP address from, if empty defaults to leaving Client header alone (X-Real-Ip, X-Client-Ip, X-Forwarded-For, Cf-Connecting-Ip, etc.)")
+	accessLog := flag.String("access-log", "", "Path to access log file (e.g. /var/log/nobot/access.log)")
 
 	cachePath := flag.String("cache", path.Join(os.TempDir(), "go_away_cache"), "path to temporary cache directory")
 
@@ -156,6 +157,9 @@ func main() {
 		} else {
 			*backendIpHeader = *clientIpHeader
 		}
+	}
+	if *accessLog == "" && opt.AccessLog != "" {
+		*accessLog = opt.AccessLog
 	}
 
 	var seed []byte
@@ -270,6 +274,7 @@ func main() {
 			ClientIpHeader:        *clientIpHeader,
 			BackendIpHeader:       *backendIpHeader,
 			ChallengeResponseCode: http.StatusTeapot,
+			AccessLog:             *accessLog,
 		}
 
 		state, err := lib.NewState(*p, opt, stateSettings)

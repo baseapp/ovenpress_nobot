@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bufio"
 	"codeberg.org/meta/gzipped/v2"
 	"fmt"
 	"git.gammaspectra.live/git/go-away/embed"
@@ -10,6 +11,7 @@ import (
 	"git.gammaspectra.live/git/go-away/utils"
 	"golang.org/x/net/html"
 	"log/slog"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
@@ -330,10 +332,67 @@ func (state *State) setupRoutes() error {
 	return nil
 }
 
+type statusResponseWriter struct {
+	http.ResponseWriter
+	status int
+	length int64
+}
+
+func (w *statusResponseWriter) WriteHeader(status int) {
+	if w.status == 0 {
+		w.status = status
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusResponseWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	n, err := w.ResponseWriter.Write(b)
+	w.length += int64(n)
+	return n, err
+}
+
+func (w *statusResponseWriter) Flush() {
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := w.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, fmt.Errorf("hijack not supported")
+}
+
 func (state *State) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	t0 := time.Now()
 	r, data := challenge.CreateRequestData(r, state)
 
-	data.EvaluateChallenges(w, r)
+	sw := &statusResponseWriter{ResponseWriter: w}
 
-	state.Mux.ServeHTTP(w, r)
+	defer func() {
+		if state.accessLogWriter != nil {
+			duration := time.Since(t0)
+			status := sw.status
+			if status == 0 {
+				status = http.StatusOK
+			}
+			rule := data.ExtraHeaders.Get("X-Away-Rule")
+			action := data.ExtraHeaders.Get("X-Away-Action")
+			if rule == "" {
+				rule = w.Header().Get("X-Away-Rule")
+			}
+			if action == "" {
+				action = w.Header().Get("X-Away-Action")
+			}
+			state.WriteAccessLog(r, data, status, sw.length, duration, rule, action)
+		}
+	}()
+
+	data.EvaluateChallenges(sw, r)
+
+	state.Mux.ServeHTTP(sw, r)
 }

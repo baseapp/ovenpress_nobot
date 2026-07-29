@@ -26,6 +26,7 @@ type Settings struct {
 
 	ClientIpHeader  string `yaml:"client-ip-header"`
 	BackendIpHeader string `yaml:"backend-ip-header"`
+	AccessLog       string `yaml:"access-log"`
 }
 
 type Link struct {

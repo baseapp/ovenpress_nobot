@@ -87,6 +87,7 @@ func (r VerifyResult) String() string {
 
 type StateInterface interface {
 	RegisterCondition(operator string, conditions ...string) (cel.Program, error)
+	IsResponseTimeLimitExceeded(r *http.Request) bool
 
 	Client() *http.Client
 	PrivateKeyFingerprint() []byte
@@ -118,4 +119,6 @@ type StateInterface interface {
 	Strings() utils.Strings
 
 	GetBackend(host string) http.Handler
+
+	GetClientIpHeader(host string) string
 }

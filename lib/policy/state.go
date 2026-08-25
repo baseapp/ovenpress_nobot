@@ -14,6 +14,7 @@ type StateSettings struct {
 	BasePath        string
 	ClientIpHeader  string
 	BackendIpHeader string
+	AccessLog       string
 
 	ChallengeResponseCode int
 }

@@ -1,37 +1,40 @@
 package lib
 
 import (
-	http_cel "codeberg.org/gone/http-cel"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"git.gammaspectra.live/git/go-away/lib/challenge"
-	"git.gammaspectra.live/git/go-away/lib/policy"
-	"git.gammaspectra.live/git/go-away/lib/settings"
-	"git.gammaspectra.live/git/go-away/utils"
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/common/types"
-	"github.com/yl2chen/cidranger"
-	"github.com/oschwald/geoip2-golang"
-	"golang.org/x/net/html"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	http_cel "codeberg.org/gone/http-cel"
+	"git.gammaspectra.live/git/go-away/lib/challenge"
+	"git.gammaspectra.live/git/go-away/lib/policy"
+	"git.gammaspectra.live/git/go-away/lib/settings"
+	"git.gammaspectra.live/git/go-away/utils"
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types"
+	"github.com/oschwald/geoip2-golang"
+	"github.com/yl2chen/cidranger"
+	"golang.org/x/net/html"
 )
 
 type GeoIPCacheEntry struct {
-    IsoCode string
-    Name    string
+	IsoCode string
+	Name    string
 }
 
 type State struct {
@@ -60,10 +63,17 @@ type State struct {
 
 	Mux *http.ServeMux
 
-	geoipDB *geoip2.Reader
-	geoipCache          map[string]GeoIPCacheEntry
-    maxGeoIPCacheSize   int
+	geoipDB           *geoip2.Reader
+	geoipCache        map[string]GeoIPCacheEntry
+	maxGeoIPCacheSize int
 
+	tracker            *IPResponseTimeTracker
+	responseTimeLimit  time.Duration
+	responseTimeWindow time.Duration
+	responseTimeSkip   cel.Program
+
+	accessLogWriter io.Writer
+	accessLogMutex  sync.Mutex
 }
 
 func NewState(p policy.Policy, opt settings.Settings, settings policy.StateSettings) (state *State, err error) {
@@ -285,13 +295,39 @@ func NewState(p policy.Policy, opt settings.Settings, settings policy.StateSetti
 		}
 	}()
 
-
-	db, err := geoip2.Open("GeoLite2-Country.mmdb")
+	db, err := geoip2.Open("assets/country.db")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open GeoLite2-Country.mmdb: %w", err)
+		return nil, fmt.Errorf("failed to open country.db: %w", err)
 	}
 	state.geoipDB = db
 	state.maxGeoIPCacheSize = 10000
+
+	state.tracker = NewIPResponseTimeTracker()
+	state.responseTimeLimit = p.ResponseTimeProtection.Limit
+	state.responseTimeWindow = p.ResponseTimeProtection.Window
+	if p.ResponseTimeProtection.SkipCondition != "" {
+		cond := conditionReplacer.Replace(p.ResponseTimeProtection.SkipCondition)
+		skipProgram, err := state.RegisterCondition(http_cel.OperatorOr, cond)
+		if err != nil {
+			return nil, fmt.Errorf("invalid response time skip condition: %w", err)
+		}
+		state.responseTimeSkip = skipProgram
+	}
+
+	if settings.AccessLog != "" {
+		dir := filepath.Dir(settings.AccessLog)
+		if dir != "." && dir != "/" {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create access log directory: %w", err)
+			}
+		}
+		file, err := os.OpenFile(settings.AccessLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open access log file: %w", err)
+		}
+		state.accessLogWriter = file
+	}
 
 	return state, nil
 }
@@ -309,7 +345,84 @@ func (state *State) Close() error {
 				}
 			}
 		}
+		if state.accessLogWriter != nil {
+			if file, ok := state.accessLogWriter.(*os.File); ok {
+				_ = file.Close()
+			}
+		}
 	}
 
 	return nil
+}
+
+func (state *State) IsResponseTimeLimitExceeded(r *http.Request) bool {
+	if state.responseTimeLimit <= 0 || state.responseTimeWindow <= 0 {
+		return false
+	}
+	data := challenge.RequestDataFromContext(r.Context())
+	if data == nil {
+		return false
+	}
+
+	if state.responseTimeSkip != nil {
+		out, _, err := state.responseTimeSkip.Eval(data)
+		if err != nil {
+			state.Logger(r).Error("error evaluating response time skip condition", "error", err)
+		} else if out.Equal(types.True) == types.True {
+			data.IsResponseTimeExempt = true
+			return false
+		}
+	}
+
+	totalTime := state.tracker.Sum(data.RemoteAddress.Addr(), state.responseTimeWindow)
+	return totalTime > state.responseTimeLimit
+}
+
+type AccessLogEntry struct {
+	Time       string  `json:"time"`
+	RemoteIP   string  `json:"remote_ip"`
+	Host       string  `json:"host"`
+	Method     string  `json:"method"`
+	Path       string  `json:"path"`
+	Query      string  `json:"query"`
+	Status     int     `json:"status"`
+	BytesSent  int64   `json:"bytes_sent"`
+	DurationMs float64 `json:"duration_ms"`
+	UserAgent  string  `json:"user_agent"`
+	Rule       string  `json:"rule,omitempty"`
+	Action     string  `json:"action,omitempty"`
+}
+
+func (state *State) WriteAccessLog(r *http.Request, data *challenge.RequestData, status int, bytesSent int64, duration time.Duration, rule, action string) {
+	if state.accessLogWriter == nil {
+		return
+	}
+	entry := AccessLogEntry{
+		Time:       time.Now().UTC().Format(time.RFC3339),
+		RemoteIP:   data.RemoteAddress.Addr().String(),
+		Host:       r.Host,
+		Method:     r.Method,
+		Path:       r.URL.Path,
+		Query:      r.URL.RawQuery,
+		Status:     status,
+		BytesSent:  bytesSent,
+		DurationMs: float64(duration.Microseconds()) / 1000.0,
+		UserAgent:  r.UserAgent(),
+		Rule:       rule,
+		Action:     action,
+	}
+
+	bytes, err := json.Marshal(entry)
+	if err != nil {
+		state.Logger(r).Error("failed to marshal access log entry", "error", err)
+		return
+	}
+
+	state.accessLogMutex.Lock()
+	defer state.accessLogMutex.Unlock()
+
+	_, err = state.accessLogWriter.Write(append(bytes, '\n'))
+	if err != nil {
+		state.Logger(r).Error("failed to write access log entry", "error", err)
+	}
 }

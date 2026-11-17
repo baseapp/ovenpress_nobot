@@ -1,0 +1,88 @@
+# Example cmdline (forward requests from upstream to port :8080)
+# $ go-away --bind :8080 --backend site.example.com=http://site:3000 --policy examples/generic.yml --policy-snippets example/snippets/ --challenge-template anubis
+
+
+
+# Define networks to be used later below
+networks:
+  # Networks will get included from snippets
+
+
+challenges:
+  # Challenges will get included from snippets
+
+conditions:
+  # Conditions will get replaced on rules AST when found as ($condition-name)
+
+  # Conditions will get included from snippets
+
+
+  is-static-asset:
+    - 'path == "/apple-touch-icon.png"'
+    - 'path == "/apple-touch-icon-precomposed.png"'
+    - 'path.matches("\\.(manifest|ttf|woff|woff2|jpg|jpeg|gif|png|webp|avif|svg|mp4|webm|css|js|mjs|wasm)$")'
+
+  is-suspicious-crawler:
+    - 'userAgent.contains("Presto/") || userAgent.contains("Trident/")'
+    # Old IE browsers
+    - 'userAgent.matches("MSIE ([2-9]|10|11)\\.")'
+    # Old Linux browsers
+    - 'userAgent.matches("Linux i[63]86") || userAgent.matches("FreeBSD i[63]86")'
+    # Old Windows browsers
+    - 'userAgent.matches("Windows (3|95|98|CE)") || userAgent.matches("Windows NT [1-5]\\.")'
+    # Old mobile browsers
+    - 'userAgent.matches("Android [1-5]\\.") || userAgent.matches("(iPad|iPhone) OS [1-9]_")'
+    # Old generic browsers
+    - 'userAgent.startsWith("Opera/")'
+    #- 'userAgent.matches("Gecko/(201[0-9]|200[0-9])")'
+    - 'userAgent.matches("^Mozilla/[1-4]")'
+
+
+# Rules are checked sequentially in order, from top to bottom
+rules:
+  - name: allow-well-known-resources
+    conditions:
+      - '($is-well-known-asset)'
+    action: pass
+
+  - name: allow-static-resources
+    conditions:
+      - '($is-static-asset)'
+    action: pass
+
+  - name: desired-crawlers
+    conditions:
+      - *is-bot-googlebot
+      - *is-bot-bingbot
+      - *is-bot-duckduckbot
+      - *is-bot-kagibot
+      - *is-bot-qwantbot
+      - *is-bot-yandexbot
+    action: pass
+
+  - name: admin-ajax
+    conditions:
+      - 'path == "/admin-ajax.php"'
+    action: pass
+
+  - name: homesite
+    conditions:
+      - 'path == "/"  && size(query) == 0 '
+    action: pass
+ 
+  - name: wp-login
+    conditions:
+      - 'path == "/wp-login.php"'
+    action: challenge
+    settings:
+      challenges: [captcha]
+
+  - name: standard-browser
+    action: challenge
+    settings:
+      challenges: [js-pow-sha256] 
+    conditions:
+      - '($is-generic-browser)'
+
+
+

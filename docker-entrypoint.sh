@@ -2,7 +2,7 @@
 set -e
 
 if [ $# -eq 0 ] || [ "${1#-}" != "$1" ]; then
-        set -- /bin/go-away \
+        set -- /bin/nobot \
                 --bind "${GOAWAY_BIND}" --bind-network "${GOAWAY_BIND_NETWORK}" --socket-mode "${GOAWAY_SOCKET_MODE}" \
                 --metrics-bind "${GOAWAY_METRICS_BIND}" --debug-bind "${GOAWAY_DEBUG_BIND}" \
                 --config "${GOAWAY_CONFIG}" \
@@ -18,9 +18,9 @@ if [ $# -eq 0 ] || [ "${1#-}" != "$1" ]; then
                 "$@"
 fi
 
-if [ "$1" = "go-away" ]; then
+if [ "$1" = "nobot" ]; then
         shift
-        set -- /bin/go-away "$@"
+        set -- /bin/nobot "$@"
 fi
 
 exec "$@"

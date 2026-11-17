@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ .Title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="referrer" content="origin"/>
+    {{ range .MetaTags }}
+    <meta {{ range $key, $value := . }}{{ $key | attr }}="{{ $value }}" {{end}}/>
+    {{ end }}
+    {{ range .LinkTags }}
+    <link {{ range $key, $value := . }}{{ $key | attr }}="{{ $value }}" {{end}}/>
+    {{ end }}
+    {{ range .HeaderTags }}
+    {{ . }}
+    {{ end }}
+    <style>
+        body {
+            background-color: #ffffff;
+            color: #111111;
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+<div id="title" hidden></div>
+
+{{if .CaptchaSVG}}
+<p>{{ .Strings.Get "captcha_instruction" }}</p>
+<div style="margin-bottom: 1rem;">
+    {{ .CaptchaSVG }}
+</div>
+{{if .Error}}
+<p style="color: #cc0000;">{{ .Error }}</p>
+{{end}}
+<form method="POST" action="{{ .VerifyURL }}">
+    <input type="text" name="captcha_input" placeholder="{{ .Strings.Get "captcha_input_placeholder" }}" required autocomplete="off" autofocus/>
+    <button type="submit">{{ .Strings.Get "captcha_submit_button" }}</button>
+</form>
+{{else if .Error}}
+<p id="status">{{ .Strings.Get "status_error" }} {{ .Error }}</p>
+{{else}}
+<p id="status">{{ .Strings.Get "status_loading" }}</p>
+{{end}}
+
+{{if .Redirect}}
+<p><a href="{{ .Redirect }}">{{ .Strings.Get "button_refresh_page" }}</a></p>
+{{end}}
+
+{{if .EndTags}}
+<noscript>
+    {{ .Strings.Get "noscript_warning" }}
+</noscript>
+{{end}}
+
+{{ range .EndTags }}
+{{ . }}
+{{ end }}
+</body>
+</html>

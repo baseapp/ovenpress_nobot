@@ -22,7 +22,7 @@ local Build(mirror, go, alpine, os, arch) = {
                 "apk update",
                 "apk add --no-cache git",
                 "mkdir .bin",
-                "go build -v -pgo=auto -v -trimpath -ldflags='-buildid= -bindnow' -buildmode pie -o ./.bin/go-away ./cmd/go-away",
+                "go build -v -pgo=auto -v -trimpath -ldflags='-buildid= -bindnow' -buildmode pie -o ./.bin/nobot ./cmd/nobot",
                 "go build -v -trimpath -ldflags='-buildid= -bindnow' -buildmode pie -o ./.bin/test-wasm-runtime ./cmd/test-wasm-runtime",
             ],
         },
@@ -32,7 +32,7 @@ local Build(mirror, go, alpine, os, arch) = {
             mirror: mirror,
             depends_on: ["build"],
             commands: [
-                "./.bin/go-away --check --slog-level DEBUG --backend example.com=http://127.0.0.1:80 --policy examples/forgejo.yml --policy-snippets examples/snippets/"
+                "./.bin/nobot --check --slog-level DEBUG --backend example.com=http://127.0.0.1:80 --policy examples/forgejo.yml --policy-snippets examples/snippets/"
             ],
         },
         {
@@ -41,7 +41,7 @@ local Build(mirror, go, alpine, os, arch) = {
             mirror: mirror,
             depends_on: ["build"],
             commands: [
-                "./.bin/go-away --check --slog-level DEBUG --backend example.com=http://127.0.0.1:80 --policy examples/generic.yml --policy-snippets examples/snippets/"
+                "./.bin/nobot --check --slog-level DEBUG --backend example.com=http://127.0.0.1:80 --policy examples/generic.yml --policy-snippets examples/snippets/"
             ],
         },
         {
@@ -50,7 +50,7 @@ local Build(mirror, go, alpine, os, arch) = {
             mirror: mirror,
             depends_on: ["build"],
             commands: [
-                "./.bin/go-away --check --slog-level DEBUG --backend example.com=http://127.0.0.1:80 --policy examples/spa.yml --policy-snippets examples/snippets/"
+                "./.bin/nobot --check --slog-level DEBUG --backend example.com=http://127.0.0.1:80 --policy examples/spa.yml --policy-snippets examples/snippets/"
             ],
         },
         {

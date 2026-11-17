@@ -11,5 +11,5 @@ challenges:
       # needs to be under runtime folder
       wasm-runtime: runtime.wasm
       wasm-runtime-settings:
-        difficulty: 20
+        difficulty: 10
       verify-probability: 0.02

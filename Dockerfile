@@ -32,14 +32,14 @@ RUN if [[ "$GOARCH" == "riscv64" ]]; then export BUILDMODE=exe; fi && \
     go build -v \
     -pgo=auto \
     -trimpath -ldflags='-buildid= -bindnow' -buildmode $BUILDMODE \
-    -o "${GOBIN}/go-away" ./cmd/go-away
+    -o "${GOBIN}/nobot" ./cmd/nobot
 
-RUN test -e "${GOBIN}/go-away"
+RUN test -e "${GOBIN}/nobot"
 
 
 FROM ${from}
 
-COPY --from=build /go/bin/go-away /bin/go-away
+COPY --from=build /go/bin/nobot /bin/nobot
 COPY examples/snippets/ /snippets/
 COPY docker-entrypoint.sh /
 

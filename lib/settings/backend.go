@@ -120,6 +120,9 @@ func (b Backend) Create() (*httputil.ReverseProxy, error) {
 					req.Header.Set(b.IpHeader, ip.Addr().Unmap().String())
 				}
 			}
+			if req.Header.Get("X-Forwarded-Host") == "" && req.Host != "" {
+				req.Header.Set("X-Forwarded-Host", req.Host)
+			}
 			if b.Host != "" {
 				req.Host = b.Host
 			}

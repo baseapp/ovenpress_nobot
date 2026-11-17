@@ -28,5 +28,5 @@ http://localhost:8080
 From the repository root, you can proxy port `8080` through `go-away` using the `minimal` challenge template:
 
 ```bash
-./nobot.exe --bind :8081 --backend *=http://127.0.0.1:8080 --policy examples/generic.yml --policy-snippets examples/snippets/ --challenge-template minimal
+./nobot.exe --bind :8081 --backend *=http://127.0.0.1:8080 --policy examples/generic_wp.yml --policy-snippets examples/snippets/ --challenge-template minimal
 ```

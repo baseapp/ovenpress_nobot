@@ -112,6 +112,17 @@ func MakeReverseProxy(target string, goDns bool, dialTimeout time.Duration) (*ht
 
 	rp := httputil.NewSingleHostReverseProxy(u)
 
+	origDirector := rp.Director
+	rp.Director = func(req *http.Request) {
+		if req.Header.Get("X-Forwarded-Proto") == "" {
+			req.Header.Set("X-Forwarded-Proto", GetRequestScheme(req))
+		}
+		if req.Header.Get("X-Forwarded-Host") == "" && req.Host != "" {
+			req.Header.Set("X-Forwarded-Host", req.Host)
+		}
+		origDirector(req)
+	}
+
 	rp.Transport = transport
 
 	return rp, nil

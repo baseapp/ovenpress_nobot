@@ -18,9 +18,7 @@ conditions:
 
 
   is-static-asset:
-    - 'path == "/apple-touch-icon.png"'
-    - 'path == "/apple-touch-icon-precomposed.png"'
-    - 'path.matches("\\.(manifest|ttf|woff|woff2|jpg|jpeg|gif|png|webp|avif|svg|mp4|webm|css|js|mjs|wasm)$")'
+    - 'path.matches("^/(wp-content|wp-includes)/.+\\.(css|js|mjs|woff2?|ttf|jpe?g|png|gif|webp|avif|svg|ico|mp4|webm)$")'
 
   is-suspicious-crawler:
     - 'userAgent.contains("Presto/") || userAgent.contains("Trident/")'
@@ -61,10 +59,18 @@ rules:
       - *is-bot-jetpack
     action: pass
 
-  - name: admin-ajax
-    conditions:
-      - 'path == "/admin-ajax.php"'
+  - name: wp-ajax
+    conditions: ['path == "/wp-admin/admin-ajax.php"']
     action: pass
+
+  - name: block-xmlrpc
+    conditions: ['path == "/xmlrpc.php" && !remoteAddress.network("jetpack")']
+    action: deny
+
+  - name: block-probes
+    conditions:
+      - 'path.matches("(?i)(/\\.env|/\\.git|wp-config\\.php|\\.sql$|phpunit|/\\.aws)")'
+    action: drop    
 
   - name: homesite
     conditions:
@@ -78,12 +84,11 @@ rules:
     settings:
       challenges: [captcha]
 
-  - name: standard-browser
+  - name: catch-all            # replaces standard-browser; last rule
+    conditions: ['true']
     action: challenge
     settings:
-      challenges: [js-pow-sha256] 
-    conditions:
-      - '($is-generic-browser)'
+      challenges: [js-pow-sha256]
 
 
 

@@ -84,7 +84,7 @@ rules:
     settings:
       challenges: [captcha]
 
-  - name: catch-all            # replaces standard-browser; last rule
+  - name: catch-all            # catch all
     conditions: ['true']
     action: challenge
     settings:

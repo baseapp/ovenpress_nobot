@@ -1,0 +1,10 @@
+networks:
+  jetpack:
+    # https://jetpack.com/support/how-to-add-jetpack-ips-allowlist/
+    - url: https://jetpack.com/ips-v4.json
+      jq-path: '.[]'
+
+conditions:
+  is-bot-jetpack:
+      # Jetpack recommends allowlisting by IP only; its requests do not use a single consistent User-Agent
+      - &is-bot-jetpack 'remoteAddress.network("jetpack")'

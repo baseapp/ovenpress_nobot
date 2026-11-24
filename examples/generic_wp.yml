@@ -58,6 +58,7 @@ rules:
       - *is-bot-kagibot
       - *is-bot-qwantbot
       - *is-bot-yandexbot
+      - *is-bot-jetpack
     action: pass
 
   - name: admin-ajax

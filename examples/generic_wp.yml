@@ -84,6 +84,11 @@ rules:
     settings:
       challenges: [captcha]
 
+  - name: uptime-checkers
+    conditions:
+      - 'userAgent.matches("(?i)uptime")'
+    action: pass
+
   - name: catch-all            # catch all
     conditions: ['true']
     action: challenge
